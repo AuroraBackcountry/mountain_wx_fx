@@ -14,7 +14,6 @@ import json
 from datetime import datetime
 from forecast_cli import run_forecast
 from mountain_focused_response import create_mountain_focused_response
-from improved_simplified_response import create_simplified_response
 import numpy as np
 
 app = Flask(__name__)
@@ -501,7 +500,6 @@ def get_forecast():
         "longitude": -123.15,
         "location_name": "Whistler",
         "forecast_days": 3,
-        "simplified": true,
         "elevation": 2181  // Optional
     }
     """
@@ -522,12 +520,6 @@ def get_forecast():
             if elevation is not None:
                 elevation = int(elevation)
             
-            # Handle boolean conversion for simplified parameter
-            simplified_param = data.get('simplified', True)  # Default to True
-            if isinstance(simplified_param, str):
-                simplified = simplified_param.lower() == 'true'
-            else:
-                simplified = bool(simplified_param)
         except (ValueError, TypeError) as e:
             return jsonify({
                 "error": "Invalid data type",
