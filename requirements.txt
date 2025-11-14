@@ -1,0 +1,16 @@
+# Open-Meteo API client and dependencies
+openmeteo-requests==1.7.4
+requests-cache==1.2.1
+retry-requests==2.0.0
+
+# Data processing and analysis
+numpy>=2.0.0
+pandas>=2.2.0
+
+# Optional: for development
+# ipython
+# jupyter
+
+# Optional: for HTTP API integration
+# flask>=3.0.0
+# flask-cors>=4.0.0
