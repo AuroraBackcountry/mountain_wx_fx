@@ -108,6 +108,11 @@ def run_forecast(lat, lon, days=3, location_name=None,
     # Get responses from API
     responses = openmeteo.weather_api(url, params=params)
     
+    # Extract elevation from first response
+    elevation = None
+    if responses and len(responses) > 0:
+        elevation = responses[0].Elevation()
+    
     # Process responses
     processor = DataProcessor()
     data = processor.process_responses(responses)
@@ -117,7 +122,8 @@ def run_forecast(lat, lon, days=3, location_name=None,
     location = {
         "lat": lat,
         "lon": lon,
-        "name": location_name or f"{lat}, {lon}"
+        "name": location_name or f"{lat}, {lon}",
+        "elevation": elevation
     }
     
     # Determine which variables we can process

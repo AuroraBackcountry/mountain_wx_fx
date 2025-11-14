@@ -332,7 +332,7 @@ def create_mountain_focused_response(forecast: Dict, location_name: str, elevati
                 'latitude': forecast['metadata']['location']['lat'],
                 'longitude': forecast['metadata']['location']['lon']
             },
-            'elevation': elevation or 'not_specified'
+            'elevation': elevation or forecast['metadata']['location'].get('elevation', 'not_specified')
         },
         'generated_at': forecast['metadata']['generated_at'],
         'current_conditions': {
