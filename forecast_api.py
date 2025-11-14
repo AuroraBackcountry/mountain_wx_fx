@@ -16,6 +16,8 @@ from flask_cors import CORS
 import json
 from datetime import datetime
 from forecast_cli import run_forecast
+from forecast_generator import ForecastGenerator
+import numpy as np
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for webhook access
@@ -549,14 +551,24 @@ def get_forecast():
         # Add readable timestamp
         forecast['metadata']['generated_at_readable'] = datetime.utcnow().strftime("%B %d, %Y at %I:%M %p UTC")
         
-        # Convert to JSON string first to handle numpy/pandas types
-        from forecast_generator import ForecastGenerator
-        generator = ForecastGenerator()
-        json_str = generator.to_json(forecast, pretty=False)
+        # Convert numpy/pandas types to Python native types
+        def convert_to_native(obj):
+            """Convert numpy/pandas types to native Python types"""
+            if isinstance(obj, np.integer):
+                return int(obj)
+            elif isinstance(obj, np.floating):
+                return float(obj)
+            elif isinstance(obj, np.ndarray):
+                return obj.tolist()
+            elif isinstance(obj, dict):
+                return {key: convert_to_native(value) for key, value in obj.items()}
+            elif isinstance(obj, list):
+                return [convert_to_native(item) for item in obj]
+            else:
+                return obj
         
-        # Parse back to dict and return
-        import json
-        forecast_dict = json.loads(json_str)
+        # Convert the forecast to native types
+        forecast_dict = convert_to_native(forecast)
         
         # If simplified response requested, reduce data size
         if simplified:
@@ -592,6 +604,54 @@ def health():
         "service": "Mountain Weather Forecast API",
         "version": "1.0"
     })
+
+@app.route('/api/test-forecast', methods=['POST'])
+def test_forecast():
+    """Test endpoint to debug forecast generation"""
+    import time
+    start_time = time.time()
+    
+    try:
+        data = request.json
+        app.logger.info(f"Test forecast request: {data}")
+        
+        # Step 1: Parse parameters
+        lat = float(data.get('latitude', 47.4))
+        lon = float(data.get('longitude', -121.5))
+        days = int(data.get('forecast_days', 3))
+        location_name = data.get('location_name', 'Test Location')
+        
+        step1_time = time.time()
+        app.logger.info(f"Step 1 (parse params) took: {step1_time - start_time:.2f}s")
+        
+        # Step 2: Run forecast
+        try:
+            forecast = run_forecast(lat, lon, days, location_name)
+            step2_time = time.time()
+            app.logger.info(f"Step 2 (run forecast) took: {step2_time - step1_time:.2f}s")
+        except Exception as e:
+            app.logger.error(f"Forecast generation error: {e}")
+            return jsonify({"error": f"Forecast generation failed: {str(e)}"}), 500
+        
+        # Step 3: Simple response (no complex serialization)
+        simple_response = {
+            "success": True,
+            "location": location_name,
+            "coordinates": {"lat": lat, "lon": lon},
+            "forecast_days": days,
+            "summary": forecast.get('summary', {}).get('executive_summary', 'No summary'),
+            "generation_time": f"{time.time() - start_time:.2f} seconds"
+        }
+        
+        return jsonify(simple_response)
+        
+    except Exception as e:
+        app.logger.error(f"Test forecast error: {e}")
+        return jsonify({
+            "error": str(e),
+            "type": type(e).__name__,
+            "elapsed_time": f"{time.time() - start_time:.2f} seconds"
+        }), 500
 
 if __name__ == '__main__':
     # Run the server
