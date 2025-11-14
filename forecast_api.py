@@ -513,6 +513,7 @@ def get_forecast():
             lat = float(data['latitude'])
             lon = float(data['longitude'])
             days = int(data.get('forecast_days', 3))  # Ensure it's an integer
+            simplified = data.get('simplified', False)  # Option for smaller response
         except (ValueError, TypeError) as e:
             return jsonify({
                 "error": "Invalid data type",
@@ -540,7 +541,35 @@ def get_forecast():
         # Add readable timestamp
         forecast['metadata']['generated_at_readable'] = datetime.utcnow().strftime("%B %d, %Y at %I:%M %p UTC")
         
-        return jsonify(forecast)
+        # Convert to JSON string first to handle numpy/pandas types
+        from forecast_generator import ForecastGenerator
+        generator = ForecastGenerator()
+        json_str = generator.to_json(forecast, pretty=False)
+        
+        # Parse back to dict and return
+        import json
+        forecast_dict = json.loads(json_str)
+        
+        # If simplified response requested, reduce data size
+        if simplified:
+            simplified_response = {
+                "metadata": forecast_dict.get("metadata", {}),
+                "summary": forecast_dict.get("summary", {}),
+                "current": forecast_dict["hourly"][0] if forecast_dict.get("hourly") else {},
+                "next_6_hours": forecast_dict["hourly"][:6] if forecast_dict.get("hourly") else [],
+                "daily_summary": [
+                    {
+                        "date": day.get("date"),
+                        "summary": day.get("summary", ""),
+                        "temperature_range": f"{day.get('temperature_2m', {}).get('min', 'N/A')} to {day.get('temperature_2m', {}).get('max', 'N/A')}°C",
+                        "precipitation_total": day.get('precipitation', {}).get('mean', 0)
+                    }
+                    for day in forecast_dict.get("daily", [])[:3]
+                ]
+            }
+            return jsonify(simplified_response)
+        
+        return jsonify(forecast_dict)
         
     except ValueError as e:
         return jsonify({"error": f"Invalid input: {str(e)}"}), 400

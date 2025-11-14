@@ -1,0 +1,40 @@
+{
+  "comment": "Example n8n HTTP Request node configuration for Mountain Weather API",
+  "node": "HTTP Request",
+  "parameters": {
+    "method": "POST",
+    "url": "https://mountain-wx-fx.onrender.com/api/forecast",
+    "sendHeaders": true,
+    "headerParameters": {
+      "parameters": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ]
+    },
+    "sendBody": true,
+    "bodyParametersJson": {
+      "latitude": "={{$json.latitude}}",
+      "longitude": "={{$json.longitude}}",
+      "location_name": "={{$json.location_name}}",
+      "forecast_days": "={{$json.forecast_days || 3}}"
+    },
+    "options": {
+      "timeout": 30000
+    }
+  },
+  "example_input": {
+    "latitude": 50.06,
+    "longitude": -123.15,
+    "location_name": "Squamish, BC",
+    "forecast_days": 3
+  },
+  "notes": [
+    "The API now handles string inputs automatically",
+    "latitude and longitude are required",
+    "location_name and forecast_days are optional",
+    "forecast_days defaults to 3 if not provided",
+    "Response will be in JSON format with weather data"
+  ]
+}
