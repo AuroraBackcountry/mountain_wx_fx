@@ -117,6 +117,11 @@ class EnhancedForecastGenerator:
                 # Also calculate snow level based on temperature
                 entry['snow_level'] = self._estimate_snow_level(temp_stats)
             
+            # Cloud cover statistics
+            cloud_stats = self._get_variable_stats(df, 'cloud_cover', timestamp)
+            if cloud_stats:
+                entry['cloud_cover'] = cloud_stats
+            
             # Wind handling with fallback
             wind_data = self._get_wind_data(df, timestamp)
             entry.update(wind_data)
