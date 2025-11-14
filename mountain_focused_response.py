@@ -157,14 +157,14 @@ def get_daily_summary(daily_data: List[Dict], hourly_data: List[Dict] = None) ->
                     temp_data = h.get('temperature_2m', {})
                     all_temps.extend([temp_data.get('min', 0), temp_data.get('max', 0)])
                 
-                actual_min = min(all_temps) if all_temps else day['temperature']['min']
-                actual_max = max(all_temps) if all_temps else day['temperature']['max']
+                actual_min = min(all_temps) if all_temps else day.get('temperature', {}).get('min', 0)
+                actual_max = max(all_temps) if all_temps else day.get('temperature', {}).get('max', 20)
             else:
-                actual_min = day['temperature']['min']
-                actual_max = day['temperature']['max']
+                actual_min = day.get('temperature', {}).get('min', 0)
+                actual_max = day.get('temperature', {}).get('max', 20)
         else:
-            actual_min = day['temperature']['min']
-            actual_max = day['temperature']['max']
+            actual_min = day.get('temperature', {}).get('min', 0)
+            actual_max = day.get('temperature', {}).get('max', 20)
         
         day_summary = {
             'date': day['date'],
@@ -175,16 +175,16 @@ def get_daily_summary(daily_data: List[Dict], hourly_data: List[Dict] = None) ->
                 'range': round(actual_max - actual_min, 1)
             },
             'wind': {
-                'max_speed': round(day['wind']['speed'], 1),
-                'predominant_direction': day['wind']['direction']
+                'max_speed': round(day.get('wind', {}).get('speed', 0), 1),
+                'predominant_direction': day.get('wind', {}).get('direction', 'N/A')
             },
             'precipitation': {
-                'total': round(day['precipitation_total'], 1),
-                'type': day['precipitation']['type']
+                'total': round(day.get('precipitation_total', 0), 1),
+                'type': determine_precip_type_from_day(day)
             },
             'snowfall': {
-                'total': round(day['snowfall']['total'], 1),
-                'max_rate': round(day['snowfall'].get('max_hourly', 0), 1)
+                'total': round(day.get('snowfall', {}).get('total', 0), 1),
+                'max_rate': round(day.get('snowfall', {}).get('max_hourly', 0), 1)
             },
             'freezing_level': {
                 'average': day.get('freezing_level', 'N/A'),
@@ -233,6 +233,22 @@ def determine_precip_type(hour_data: Dict) -> str:
     else:
         return 'rain'
 
+def determine_precip_type_from_day(day: Dict) -> str:
+    """Determine precipitation type for a day based on temperature and snowfall."""
+    temp_max = day.get('temperature', {}).get('max', 0)
+    temp_min = day.get('temperature', {}).get('min', 0)
+    precip_total = day.get('precipitation_total', 0)
+    snowfall_total = day.get('snowfall', {}).get('total', 0)
+    
+    if precip_total == 0:
+        return 'none'
+    elif snowfall_total > 0:
+        return 'snow' if temp_max < 2 else 'mixed'
+    elif temp_min < 1:
+        return 'mixed'
+    else:
+        return 'rain'
+
 def estimate_visibility(hour_data: Dict) -> str:
     """Estimate visibility based on precipitation and wind."""
     precip = hour_data.get('precipitation', {}).get('mean', 0)
@@ -250,20 +266,24 @@ def identify_hazards(day_data: Dict) -> List[str]:
     """Identify potential mountain hazards."""
     hazards = []
     
-    if day_data['snowfall']['total'] > 30:
+    snowfall_total = day_data.get('snowfall', {}).get('total', 0)
+    if snowfall_total > 30:
         hazards.append('heavy_snow')
-    elif day_data['snowfall']['total'] > 15:
+    elif snowfall_total > 15:
         hazards.append('moderate_snow')
     
-    if day_data['wind']['max_speed'] > 60:
+    wind_speed = day_data.get('wind', {}).get('speed', 0)
+    if wind_speed > 60:
         hazards.append('high_wind')
     
-    if day_data['temperature']['min'] < -20:
+    temp_min = day_data.get('temperature', {}).get('min', 0)
+    if temp_min < -20:
         hazards.append('extreme_cold')
     
-    if day_data.get('freezing_level', 0) == 'N/A':
+    freezing_level = day_data.get('freezing_level', 0)
+    if freezing_level == 'N/A':
         pass
-    elif isinstance(day_data.get('freezing_level'), (int, float)) and day_data['freezing_level'] > 3000:
+    elif isinstance(freezing_level, (int, float)) and freezing_level > 3000:
         hazards.append('high_freezing_level')
     
     return hazards
