@@ -348,7 +348,7 @@ class EnhancedForecastGenerator:
         
         return float(np.mean(valid)) if len(valid) > 0 else None
     
-    def _aggregate_daily_snow(self, hourly_df: pd.DataFrame, date: pd.date) -> Dict[str, float]:
+    def _aggregate_daily_snow(self, hourly_df: pd.DataFrame, date: datetime.date) -> Dict[str, float]:
         """Aggregate snowfall for a specific day from hourly data."""
         # Filter hourly data for this date
         mask = hourly_df.index.date == date
@@ -378,7 +378,7 @@ class EnhancedForecastGenerator:
         }
     
     def _get_daily_wind(self, daily_df: pd.DataFrame, hourly_df: Optional[pd.DataFrame],
-                       date: pd.date) -> Dict[str, Any]:
+                       date: datetime.date) -> Dict[str, Any]:
         """Get daily wind data with proper aggregation."""
         # Try daily aggregates first
         wind_speed = self._get_daily_value(daily_df, date, 'wind_speed_10m_mean')
@@ -419,7 +419,7 @@ class EnhancedForecastGenerator:
             'height': 'unavailable'
         }
     
-    def _aggregate_daily_freezing_level(self, hourly_df: pd.DataFrame, date: pd.date) -> float:
+    def _aggregate_daily_freezing_level(self, hourly_df: pd.DataFrame, date: datetime.date) -> float:
         """Aggregate freezing level for a day."""
         mask = hourly_df.index.date == date
         day_data = hourly_df[mask]
