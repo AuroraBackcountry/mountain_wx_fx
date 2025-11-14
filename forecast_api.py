@@ -260,6 +260,7 @@ DASHBOARD_HTML = '''
         <div class="header">
             <h1>🏔️ Mountain Weather Point Forecast</h1>
             <p>Ensemble forecast analysis for any mountain location</p>
+            <p style="font-size: 0.9em; opacity: 0.8;">Weather data by <a href="https://open-meteo.com" style="color: white;">Open-Meteo.com</a></p>
         </div>
         
         <div class="card">

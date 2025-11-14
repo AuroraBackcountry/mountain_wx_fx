@@ -91,7 +91,9 @@ class ForecastGenerator:
             'forecast_start': df.index[0].isoformat(),
             'forecast_end': df.index[-1].isoformat(),
             'models': models,
-            'ensemble_members': member_count
+            'ensemble_members': member_count,
+            'data_source': 'Open-Meteo.com',
+            'attribution': 'Weather data by Open-Meteo.com'
         }
     
     def _process_hourly(self, df: pd.DataFrame, 
