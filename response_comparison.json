@@ -1,0 +1,160 @@
+{
+  "simplified_example": {
+    "_comment": "This is what you get with simplified=true (~7KB)",
+    "metadata": {
+      "location_name": "Snoqualmie Pass",
+      "latitude": 47.4,
+      "longitude": -121.5,
+      "forecast_days": 5,
+      "models_used": ["ecmwf_ifs025", "gfs_global", "icon_global", "jma_gsm"],
+      "generated_at": "2025-11-14T18:45:00Z",
+      "generated_at_readable": "November 14, 2025 at 06:45 PM UTC"
+    },
+    "summary": {
+      "executive_summary": "Mixed conditions with light snow likely. Temperatures below freezing.",
+      "operational_conditions": {
+        "rating": "FAIR",
+        "concern_level": "MODERATE",
+        "primary_hazards": ["Moderate snowfall", "Variable visibility"],
+        "key_recommendations": ["Monitor conditions", "Winter gear required"]
+      }
+    },
+    "current": {
+      "time": "2025-11-14T19:00:00",
+      "temperature_2m": {"mean": -2.3, "min": -3.1, "max": -1.5},
+      "precipitation": {"mean": 0.2, "min": 0.0, "max": 0.5},
+      "probabilities": {
+        "precipitation": {"measurable": 0.25}
+      }
+    },
+    "next_6_hours": [
+      "... 6 hourly objects similar to 'current' ..."
+    ],
+    "daily_summary": [
+      {
+        "date": "2025-11-15",
+        "summary": "Light snow likely",
+        "temperature_range": "-5.2 to 0.1°C",
+        "precipitation_total": 2.5
+      }
+    ]
+  },
+  
+  "full_example": {
+    "_comment": "This is what you get with simplified=false (~65KB)",
+    "_note": "Contains everything above PLUS:",
+    "hourly": [
+      {
+        "time": "2025-11-14T19:00:00",
+        "temperature_2m": {
+          "mean": -2.3,
+          "min": -3.1,
+          "max": -1.5,
+          "std": 0.8,
+          "median": -2.2,
+          "p25": -2.8,
+          "p75": -1.8,
+          "trend": "stable",
+          "ensemble_spread": "narrow",
+          "models": {
+            "ecmwf_ifs025": -2.1,
+            "gfs_global": -2.5,
+            "icon_global": -2.4,
+            "jma_gsm": -2.2
+          }
+        },
+        "precipitation": {
+          "mean": 0.2,
+          "min": 0.0,
+          "max": 0.5,
+          "std": 0.15,
+          "median": 0.1,
+          "p25": 0.0,
+          "p75": 0.3,
+          "trend": "increasing",
+          "type_probability": {
+            "rain": 0.15,
+            "snow": 0.85,
+            "mixed": 0.0
+          }
+        },
+        "wind_speed_80m": {
+          "mean": 25.3,
+          "min": 15.2,
+          "max": 38.5,
+          "std": 8.2,
+          "gust_factor": 1.4
+        },
+        "cloud_cover": {
+          "mean": 78.5,
+          "min": 65.0,
+          "max": 92.0
+        },
+        "probabilities": {
+          "precipitation": {
+            "measurable": 0.25,
+            "light": 0.20,
+            "moderate": 0.10,
+            "heavy": 0.0,
+            "extreme": 0.0
+          },
+          "freezing": {
+            "at_surface": 0.85,
+            "at_2m": 0.90,
+            "hard_freeze": 0.45
+          },
+          "strong_winds": {
+            "moderate": 0.15,
+            "strong": 0.05,
+            "extreme": 0.0,
+            "damaging": 0.0
+          },
+          "visibility": {
+            "poor": 0.30,
+            "very_poor": 0.10,
+            "near_zero": 0.02
+          }
+        },
+        "snow_calculations": {
+          "snow_depth": {
+            "low": 0.5,
+            "expected": 2.1,
+            "high": 3.8,
+            "confidence": "moderate"
+          },
+          "snow_probability": 0.85,
+          "snow_level": 800,
+          "snow_to_liquid_ratio": {
+            "low": 8,
+            "expected": 12,
+            "high": 15
+          }
+        }
+      },
+      "... 71 more hourly entries ..."
+    ],
+    "model_comparison": {
+      "model_agreement": {
+        "temperature": 0.92,
+        "precipitation": 0.78,
+        "wind": 0.85,
+        "overall": 0.85
+      },
+      "outlier_models": {
+        "temperature": [],
+        "precipitation": ["jma_gsm"],
+        "wind": []
+      },
+      "confidence_assessment": "High confidence in temperature forecast. Moderate confidence in precipitation timing and amounts.",
+      "ensemble_spread": {
+        "temperature": "narrow",
+        "precipitation": "moderate",
+        "wind": "narrow"
+      },
+      "forecast_consistency": {
+        "run_to_run": 0.88,
+        "trend": "stable"
+      }
+    }
+  }
+}

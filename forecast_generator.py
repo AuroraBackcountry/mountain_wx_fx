@@ -36,7 +36,8 @@ class ForecastGenerator:
             Complete forecast dictionary
         """
         if variables is None:
-            variables = ['temperature_2m', 'precipitation', 'wind_speed_80m']
+            variables = ['temperature_2m', 'precipitation', 'wind_speed_80m', 
+                        'wind_direction_80m', 'freezing_level_height', 'snowfall']
         
         forecast = {
             'metadata': self._generate_metadata(data, location),

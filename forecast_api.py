@@ -572,20 +572,134 @@ def get_forecast():
         
         # If simplified response requested, reduce data size
         if simplified:
+            # Helper function to round values to 1 decimal place
+            def round_value(val):
+                if isinstance(val, (int, float)) and not isinstance(val, bool):
+                    return round(float(val), 1)
+                return val
+            
+            # Helper to process numeric fields in a dict
+            def round_dict_values(d):
+                if isinstance(d, dict):
+                    return {k: round_dict_values(v) for k, v in d.items()}
+                elif isinstance(d, list):
+                    return [round_dict_values(item) for item in d]
+                else:
+                    return round_value(d)
+            
+            # Process hourly data for next 6 hours with additional fields
+            next_6_hours = []
+            for hour in forecast_dict.get("hourly", [])[:6]:
+                hour_data = {
+                    "time": hour.get("time"),
+                    "temperature_2m": round_dict_values(hour.get("temperature_2m", {})),
+                    "precipitation": round_dict_values(hour.get("precipitation", {})),
+                    "wind_speed_80m": round_dict_values(hour.get("wind_speed_80m", {})),
+                    "wind_direction_80m": round_value(hour.get("wind_direction_80m", {}).get("mean", 0)) if isinstance(hour.get("wind_direction_80m"), dict) else "N/A",
+                    "freezing_level_height": round_value(hour.get("freezing_level_height", {}).get("mean", 0)) if isinstance(hour.get("freezing_level_height"), dict) else 0,
+                    "probabilities": round_dict_values(hour.get("probabilities", {}))
+                }
+                
+                # Add snowfall data if available
+                snowfall = hour.get("snowfall", {})
+                if isinstance(snowfall, dict) and snowfall:
+                    hour_data["snowfall"] = round_value(snowfall.get("mean", 0))
+                elif "snow_calculations" in hour:
+                    snow_calc = hour["snow_calculations"]
+                    if isinstance(snow_calc, dict) and "snow_depth" in snow_calc:
+                        snow_depth = snow_calc["snow_depth"]
+                        hour_data["snowfall"] = round_value(snow_depth.get("expected", 0)) if isinstance(snow_depth, dict) else 0
+                
+                # Add units for clarity
+                hour_data["units"] = {
+                    "temperature": "°C",
+                    "precipitation": "mm",
+                    "snowfall": "cm",
+                    "wind_speed": "km/h",
+                    "wind_direction": "degrees",
+                    "freezing_level": "m"
+                }
+                    
+                next_6_hours.append(hour_data)
+            
+            # Process daily summaries with additional fields
+            daily_summaries = []
+            for day in forecast_dict.get("daily", [])[:3]:
+                # Extract temperature values
+                temp_data = day.get('temperature_2m', {})
+                temp_min = round_value(temp_data.get('min', 'N/A'))
+                temp_max = round_value(temp_data.get('max', 'N/A'))
+                
+                # Get snow data - check both snowfall and snow_calculations
+                snowfall_data = day.get('snowfall', {})
+                snow_calc_data = day.get('snow_calculations', {})
+                
+                # Try to get snowfall min/max from ensemble stats
+                if isinstance(snowfall_data, dict) and 'min' in snowfall_data:
+                    snow_min = round_value(snowfall_data.get('min', 0))
+                    snow_max = round_value(snowfall_data.get('max', 0))
+                elif isinstance(snow_calc_data, dict) and 'snow_depth' in snow_calc_data:
+                    # Use snow depth calculations if available
+                    snow_depth = snow_calc_data.get('snow_depth', {})
+                    snow_min = round_value(snow_depth.get('low', 0))
+                    snow_max = round_value(snow_depth.get('high', 0))
+                else:
+                    snow_min = 0
+                    snow_max = 0
+                
+                # Get wind data
+                wind_speed_data = day.get('wind_speed_80m', {})
+                wind_speed = round_value(wind_speed_data.get('max', wind_speed_data.get('mean', 0)))
+                
+                # Get wind direction - it may be aggregated differently for daily
+                wind_dir_data = day.get('wind_direction_80m', {})
+                if isinstance(wind_dir_data, dict):
+                    wind_direction = round_value(wind_dir_data.get('mean', 0))
+                else:
+                    wind_direction = 'Variable'
+                
+                # Get freezing level
+                freezing_data = day.get('freezing_level_height', {})
+                if isinstance(freezing_data, dict):
+                    freezing_level = round_value(freezing_data.get('mean', freezing_data.get('max', 0)))
+                else:
+                    freezing_level = 0
+                
+                daily_summary = {
+                    "date": day.get("date"),
+                    "summary": day.get("summary", ""),
+                    "temperature_range": f"{temp_min} to {temp_max}°C",
+                    "temperature": {
+                        "min": temp_min,
+                        "max": temp_max,
+                        "units": "°C"
+                    },
+                    "precipitation_total": round_value(day.get('precipitation', {}).get('mean', 0)),
+                    "snowfall": {
+                        "min": snow_min,
+                        "max": snow_max,
+                        "units": "cm"
+                    },
+                    "wind": {
+                        "speed": wind_speed,
+                        "direction": wind_direction,
+                        "speed_units": "km/h",
+                        "direction_units": "degrees"
+                    },
+                    "freezing_level": {
+                        "height": freezing_level,
+                        "units": "m"
+                    }
+                }
+                daily_summaries.append(daily_summary)
+            
+            # Build simplified response with rounded values
             simplified_response = {
                 "metadata": forecast_dict.get("metadata", {}),
-                "summary": forecast_dict.get("summary", {}),
-                "current": forecast_dict["hourly"][0] if forecast_dict.get("hourly") else {},
-                "next_6_hours": forecast_dict["hourly"][:6] if forecast_dict.get("hourly") else [],
-                "daily_summary": [
-                    {
-                        "date": day.get("date"),
-                        "summary": day.get("summary", ""),
-                        "temperature_range": f"{day.get('temperature_2m', {}).get('min', 'N/A')} to {day.get('temperature_2m', {}).get('max', 'N/A')}°C",
-                        "precipitation_total": day.get('precipitation', {}).get('mean', 0)
-                    }
-                    for day in forecast_dict.get("daily", [])[:3]
-                ]
+                "summary": round_dict_values(forecast_dict.get("summary", {})),
+                "current": round_dict_values(next_6_hours[0] if next_6_hours else {}),
+                "next_6_hours": next_6_hours,
+                "daily_summary": daily_summaries
             }
             return jsonify(simplified_response)
         
