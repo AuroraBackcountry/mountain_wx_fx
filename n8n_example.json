@@ -18,7 +18,8 @@
       "latitude": "={{$json.latitude}}",
       "longitude": "={{$json.longitude}}",
       "location_name": "={{$json.location_name}}",
-      "forecast_days": "={{$json.forecast_days || 3}}"
+      "forecast_days": "={{$json.forecast_days || 3}}",
+      "simplified": true
     },
     "options": {
       "timeout": 30000
@@ -35,6 +36,8 @@
     "latitude and longitude are required",
     "location_name and forecast_days are optional",
     "forecast_days defaults to 3 if not provided",
-    "Response will be in JSON format with weather data"
+    "simplified: true reduces response size for n8n compatibility",
+    "Response will be in JSON format with weather data",
+    "Full response can be 60KB+, simplified response is ~5KB"
   ]
 }
