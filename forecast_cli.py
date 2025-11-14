@@ -24,7 +24,13 @@ from data_processor import DataProcessor
 from statistics_calculator import StatisticsCalculator
 from probability_analyzer import ProbabilityAnalyzer
 from model_comparison import ModelComparison
-from enhanced_forecast_generator import EnhancedForecastGenerator
+# Import with fallback for compatibility
+try:
+    from enhanced_forecast_generator import EnhancedForecastGenerator
+    ForecastGeneratorClass = EnhancedForecastGenerator
+except ImportError:
+    from forecast_generator import ForecastGenerator
+    ForecastGeneratorClass = ForecastGenerator
 from advanced_snow_formulas import AdvancedSnowFormulas
 
 
@@ -107,7 +113,7 @@ def run_forecast(lat, lon, days=3, location_name=None,
     data = processor.process_responses(responses)
     
     # Generate forecast
-    generator = EnhancedForecastGenerator()
+    generator = ForecastGeneratorClass()
     location = {
         "lat": lat,
         "lon": lon,
