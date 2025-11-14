@@ -125,7 +125,8 @@ def get_6hour_summary(hourly_data: List[Dict]) -> List[Dict[str, Any]]:
                 'speed': round(hour.get('wind_speed', {}).get('mean', 0), 1),
                 'gusts': round(hour.get('wind_speed', {}).get('max', 0), 1),
                 'direction': hour.get('wind_direction', 'N/A'),
-                'direction_degrees': get_direction_degrees(hour.get('wind_direction', 'N/A'))
+                'direction_degrees': get_direction_degrees(hour.get('wind_direction', 'N/A')),
+                'compass_direction': degrees_to_compass(hour.get('wind_direction', 'N/A'))
             },
             'precipitation': {
                 'amount': round(hour.get('precipitation', {}).get('mean', 0), 1),
@@ -188,7 +189,8 @@ def get_daily_summary(daily_data: List[Dict], hourly_data: List[Dict] = None) ->
             },
             'wind': {
                 'max_speed': round(day.get('wind', {}).get('speed', 0), 1),
-                'predominant_direction': day.get('wind', {}).get('direction', 'N/A')
+                'predominant_direction': day.get('wind', {}).get('direction', 'N/A'),
+                'compass_direction': degrees_to_compass(day.get('wind', {}).get('direction', 'N/A'))
             },
             'precipitation': {
                 'total': round(day.get('precipitation_total', 0), 1),
@@ -232,6 +234,31 @@ def get_direction_degrees(direction: str) -> int:
         return int(direction)
     
     return directions.get(direction, 0)
+
+def degrees_to_compass(degrees: float) -> str:
+    """Convert degrees to compass direction."""
+    if degrees is None or degrees == 'N/A':
+        return 'N/A'
+    
+    # Normalize to 0-360
+    degrees = float(degrees) % 360
+    
+    # Define compass directions with their degree ranges
+    # Using 16-point compass for better accuracy
+    directions = [
+        ('N', 0), ('NNE', 22.5), ('NE', 45), ('ENE', 67.5),
+        ('E', 90), ('ESE', 112.5), ('SE', 135), ('SSE', 157.5),
+        ('S', 180), ('SSW', 202.5), ('SW', 225), ('WSW', 247.5),
+        ('W', 270), ('WNW', 292.5), ('NW', 315), ('NNW', 337.5),
+        ('N', 360)  # Wrap around
+    ]
+    
+    # Find the closest direction
+    for i in range(len(directions) - 1):
+        if degrees < (directions[i][1] + directions[i + 1][1]) / 2:
+            return directions[i][0]
+    
+    return 'N'  # Default for edge cases
 
 def determine_precip_type(hour_data: Dict) -> str:
     """Determine precipitation type based on temperature and snow probability."""
@@ -355,6 +382,7 @@ def create_mountain_focused_response(forecast: Dict, location_name: str, elevati
                 'speed': round(current.get('wind_speed', {}).get('mean', 0), 1),
                 'gusts': round(current.get('wind_speed', {}).get('max', 0), 1),
                 'direction': current.get('wind_direction', 'N/A'),
+                'compass_direction': degrees_to_compass(current.get('wind_direction', 'N/A')),
                 'unit': 'km/h'
             },
             'snowfall': {
