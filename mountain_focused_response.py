@@ -74,8 +74,14 @@ def analyze_trends(hourly_data: List[Dict], hours: int = 6) -> Dict[str, str]:
             trends['wind'] = 'steady'
     
     # Precipitation trend
-    precip_probs = [h.get('probabilities', {}).get('precipitation', {}).get('any', 0) 
-                    for h in hourly_data[:hours]]
+    precip_probs = []
+    for h in hourly_data[:hours]:
+        probs = h.get('probabilities', {})
+        if probs and 'precipitation' in probs:
+            precip_probs.append(probs['precipitation'].get('any', 0))
+        else:
+            precip_probs.append(0)
+    
     if precip_probs:
         avg_start = np.mean(precip_probs[:2])
         avg_end = np.mean(precip_probs[-2:])
@@ -123,12 +129,18 @@ def get_6hour_summary(hourly_data: List[Dict]) -> List[Dict[str, Any]]:
             },
             'precipitation': {
                 'amount': round(hour.get('precipitation', {}).get('mean', 0), 1),
-                'probability': round(hour.get('probabilities', {}).get('precipitation', {}).get('any', 0) * 100),
+                'probability': round(
+                    hour.get('probabilities', {}).get('precipitation', {}).get('any', 0) * 100 
+                    if hour.get('probabilities', {}).get('precipitation') else 0
+                ),
                 'type': determine_precip_type(hour)
             },
             'snowfall': {
                 'amount': round(hour.get('snowfall', {}).get('mean', 0), 1),
-                'probability': round(hour.get('probabilities', {}).get('snow', {}).get('any', 0) * 100, 0)
+                'probability': round(
+                    hour.get('probabilities', {}).get('snow', {}).get('any', 0) * 100 
+                    if hour.get('probabilities', {}).get('snow') else 0, 0
+                )
             },
             'freezing_level': hour.get('freezing_level_height', 'N/A'),
             'visibility': estimate_visibility(hour)
