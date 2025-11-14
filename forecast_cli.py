@@ -63,6 +63,8 @@ def run_forecast(lat, lon, days=3, location_name=None,
             "surface_pressure",
             "wind_speed_80m",
             "wind_direction_80m",
+            "wind_speed_10m",
+            "wind_direction_10m",
             "temperature_850hPa",
             "freezing_level_height"
         ]
@@ -73,7 +75,8 @@ def run_forecast(lat, lon, days=3, location_name=None,
             "temperature_2m_max",
             "temperature_2m_mean",
             "precipitation_sum",
-            "wind_speed_10m_mean"
+            "wind_speed_10m_mean",
+            "wind_direction_10m_dominant"
         ]
     
     if models is None:

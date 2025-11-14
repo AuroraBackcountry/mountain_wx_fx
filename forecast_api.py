@@ -590,12 +590,45 @@ def get_forecast():
             # Process hourly data for next 6 hours with additional fields
             next_6_hours = []
             for hour in forecast_dict.get("hourly", [])[:6]:
+                # Handle wind data with fallback to 10m if 80m not available
+                wind_80m = hour.get("wind_speed_80m", {})
+                wind_10m = hour.get("wind_speed_10m", {})
+                wind_dir_80m = hour.get("wind_direction_80m", {})
+                wind_dir_10m = hour.get("wind_direction_10m", {})
+                
+                # Use 80m if available, otherwise fall back to 10m with adjustment
+                if isinstance(wind_80m, dict) and wind_80m.get("mean") is not None:
+                    wind_speed = round_dict_values(wind_80m)
+                    wind_height = "80m"
+                elif isinstance(wind_10m, dict) and wind_10m.get("mean") is not None:
+                    # Apply terrain factor for 10m to approximate ridge winds
+                    adjusted_wind = {}
+                    for key, value in wind_10m.items():
+                        if isinstance(value, (int, float)):
+                            adjusted_wind[key] = round_value(value * 1.4)  # 40% increase for ridge exposure
+                        else:
+                            adjusted_wind[key] = value
+                    wind_speed = adjusted_wind
+                    wind_height = "10m_adjusted"
+                else:
+                    wind_speed = {"mean": 0, "min": 0, "max": 0}
+                    wind_height = "unavailable"
+                
+                # Same for wind direction
+                if isinstance(wind_dir_80m, dict) and wind_dir_80m.get("mean") is not None:
+                    wind_direction = round_value(wind_dir_80m.get("mean", 0))
+                elif isinstance(wind_dir_10m, dict) and wind_dir_10m.get("mean") is not None:
+                    wind_direction = round_value(wind_dir_10m.get("mean", 0))
+                else:
+                    wind_direction = "N/A"
+                
                 hour_data = {
                     "time": hour.get("time"),
                     "temperature_2m": round_dict_values(hour.get("temperature_2m", {})),
                     "precipitation": round_dict_values(hour.get("precipitation", {})),
-                    "wind_speed_80m": round_dict_values(hour.get("wind_speed_80m", {})),
-                    "wind_direction_80m": round_value(hour.get("wind_direction_80m", {}).get("mean", 0)) if isinstance(hour.get("wind_direction_80m"), dict) else "N/A",
+                    "wind_speed": wind_speed,
+                    "wind_direction": wind_direction,
+                    "wind_height": wind_height,
                     "freezing_level_height": round_value(hour.get("freezing_level_height", {}).get("mean", "N/A")) if isinstance(hour.get("freezing_level_height"), dict) and hour.get("freezing_level_height", {}).get("mean") is not None else "N/A",
                     "probabilities": round_dict_values(hour.get("probabilities", {}))
                 }
@@ -647,14 +680,31 @@ def get_forecast():
                     snow_min = 0
                     snow_max = 0
                 
-                # Get wind data
-                wind_speed_data = day.get('wind_speed_80m', {})
-                wind_speed = round_value(wind_speed_data.get('max', wind_speed_data.get('mean', 0)))
+                # Get wind data with fallback to 10m
+                wind_80m_data = day.get('wind_speed_80m', {})
+                wind_10m_data = day.get('wind_speed_10m', day.get('wind_speed_10m_mean', {}))
                 
-                # Get wind direction - it may be aggregated differently for daily
-                wind_dir_data = day.get('wind_direction_80m', {})
-                if isinstance(wind_dir_data, dict):
-                    wind_direction = round_value(wind_dir_data.get('mean', 0))
+                # Check for 80m wind first, then fall back to 10m
+                if isinstance(wind_80m_data, dict) and (wind_80m_data.get('max') is not None or wind_80m_data.get('mean') is not None):
+                    wind_speed = round_value(wind_80m_data.get('max', wind_80m_data.get('mean', 0)))
+                    wind_height = "80m"
+                elif isinstance(wind_10m_data, dict) and (wind_10m_data.get('max') is not None or wind_10m_data.get('mean') is not None):
+                    # Apply terrain factor for ridge exposure
+                    base_speed = wind_10m_data.get('max', wind_10m_data.get('mean', 0))
+                    wind_speed = round_value(base_speed * 1.4)  # 40% increase
+                    wind_height = "10m_adjusted"
+                else:
+                    wind_speed = 0
+                    wind_height = "unavailable"
+                
+                # Get wind direction with fallback
+                wind_dir_80m = day.get('wind_direction_80m', {})
+                wind_dir_10m = day.get('wind_direction_10m', day.get('wind_direction_10m_dominant', {}))
+                
+                if isinstance(wind_dir_80m, dict) and wind_dir_80m.get('mean') is not None:
+                    wind_direction = round_value(wind_dir_80m.get('mean', 0))
+                elif isinstance(wind_dir_10m, dict) and (wind_dir_10m.get('mean') is not None or wind_dir_10m.get('dominant') is not None):
+                    wind_direction = round_value(wind_dir_10m.get('mean', wind_dir_10m.get('dominant', 0)))
                 else:
                     wind_direction = 'Variable'
                 
@@ -683,6 +733,7 @@ def get_forecast():
                     "wind": {
                         "speed": wind_speed,
                         "direction": wind_direction,
+                        "height": wind_height,
                         "speed_units": "km/h",
                         "direction_units": "degrees"
                     },
