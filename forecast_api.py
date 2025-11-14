@@ -1,14 +1,11 @@
 #!/usr/bin/env python3
 """
 Flask API for Mountain Weather Point Forecast
-Designed for webhook integration and web dashboard
+Enhanced with mountain-focused response format
 
-Usage:
-    python forecast_api.py
-    
 Endpoints:
-    POST /api/forecast - Get forecast for a specific point
-    GET /            - Serve HTML dashboard
+    POST /api/forecast - Get mountain-focused forecast
+    GET /              - Serve HTML dashboard
 """
 
 from flask import Flask, request, jsonify, render_template_string
@@ -16,7 +13,8 @@ from flask_cors import CORS
 import json
 from datetime import datetime
 from forecast_cli import run_forecast
-from forecast_generator import ForecastGenerator
+from mountain_focused_response import create_mountain_focused_response
+from improved_simplified_response import create_simplified_response
 import numpy as np
 
 app = Flask(__name__)
@@ -494,20 +492,22 @@ def dashboard():
 @app.route('/api/forecast', methods=['POST'])
 def get_forecast():
     """
-    API endpoint for point forecast
+    Mountain-focused weather forecast endpoint.
+    Now returns enhanced format with trends, hazards, and accurate snow calculations.
     
     Expected POST data:
     {
         "latitude": 50.06,
         "longitude": -123.15,
-        "location_name": "Squamish, BC",
+        "location_name": "Whistler",
         "forecast_days": 3,
-        "simplified": true
+        "simplified": true,
+        "elevation": 2181  // Optional
     }
     """
     try:
         data = request.json
-        app.logger.info(f"Received request data: {data}")  # Log incoming data
+        app.logger.info(f"Received request data: {data}")
         
         # Validate required fields
         if not data or 'latitude' not in data or 'longitude' not in data:
@@ -517,10 +517,13 @@ def get_forecast():
         try:
             lat = float(data['latitude'])
             lon = float(data['longitude'])
-            days = int(data.get('forecast_days', 3))  # Ensure it's an integer
+            days = int(data.get('forecast_days', 3))
+            elevation = data.get('elevation', None)
+            if elevation is not None:
+                elevation = int(elevation)
             
             # Handle boolean conversion for simplified parameter
-            simplified_param = data.get('simplified', False)
+            simplified_param = data.get('simplified', True)  # Default to True
             if isinstance(simplified_param, str):
                 simplified = simplified_param.lower() == 'true'
             else:
@@ -528,12 +531,7 @@ def get_forecast():
         except (ValueError, TypeError) as e:
             return jsonify({
                 "error": "Invalid data type",
-                "details": "Latitude and longitude must be numbers, forecast_days must be an integer",
-                "received": {
-                    "latitude": f"{type(data.get('latitude')).__name__}: {data.get('latitude')}",
-                    "longitude": f"{type(data.get('longitude')).__name__}: {data.get('longitude')}",
-                    "forecast_days": f"{type(data.get('forecast_days')).__name__}: {data.get('forecast_days')}"
-                }
+                "details": "Latitude/longitude must be numbers, forecast_days and elevation must be integers"
             }), 400
             
         location_name = data.get('location_name', f"{lat}, {lon}")
@@ -546,11 +544,8 @@ def get_forecast():
         if not 1 <= days <= 16:
             return jsonify({"error": "Forecast days must be between 1 and 16"}), 400
         
-        # Run forecast
+        # Run forecast (this automatically uses EnhancedForecastGenerator)
         forecast = run_forecast(lat, lon, days, location_name)
-        
-        # Add readable timestamp
-        forecast['metadata']['generated_at_readable'] = datetime.utcnow().strftime("%B %d, %Y at %I:%M %p UTC")
         
         # Convert numpy/pandas types to Python native types
         def convert_to_native(obj):
@@ -571,195 +566,19 @@ def get_forecast():
         # Convert the forecast to native types
         forecast_dict = convert_to_native(forecast)
         
-        # If simplified response requested, reduce data size
-        if simplified:
-            # Helper function to round values to 1 decimal place
-            def round_value(val):
-                if isinstance(val, (int, float)) and not isinstance(val, bool):
-                    return round(float(val), 1)
-                return val
-            
-            # Helper to process numeric fields in a dict
-            def round_dict_values(d):
-                if isinstance(d, dict):
-                    return {k: round_dict_values(v) for k, v in d.items()}
-                elif isinstance(d, list):
-                    return [round_dict_values(item) for item in d]
-                else:
-                    return round_value(d)
-            
-            # Process hourly data for next 6 hours with additional fields
-            next_6_hours = []
-            for hour in forecast_dict.get("hourly", [])[:6]:
-                # Handle wind data with fallback to 10m if 80m not available
-                wind_80m = hour.get("wind_speed_80m", {})
-                wind_10m = hour.get("wind_speed_10m", {})
-                wind_dir_80m = hour.get("wind_direction_80m", {})
-                wind_dir_10m = hour.get("wind_direction_10m", {})
-                
-                # Use 80m if available, otherwise fall back to 10m with adjustment
-                if isinstance(wind_80m, dict) and wind_80m.get("mean") is not None:
-                    wind_speed = round_dict_values(wind_80m)
-                    wind_height = "80m"
-                elif isinstance(wind_10m, dict) and wind_10m.get("mean") is not None:
-                    # Apply terrain factor for 10m to approximate ridge winds
-                    adjusted_wind = {}
-                    for key, value in wind_10m.items():
-                        if isinstance(value, (int, float)):
-                            adjusted_wind[key] = round_value(value * 1.4)  # 40% increase for ridge exposure
-                        else:
-                            adjusted_wind[key] = value
-                    wind_speed = adjusted_wind
-                    wind_height = "10m_adjusted"
-                else:
-                    wind_speed = {"mean": 0, "min": 0, "max": 0}
-                    wind_height = "unavailable"
-                
-                # Same for wind direction
-                if isinstance(wind_dir_80m, dict) and wind_dir_80m.get("mean") is not None:
-                    wind_direction = round_value(wind_dir_80m.get("mean", 0))
-                elif isinstance(wind_dir_10m, dict) and wind_dir_10m.get("mean") is not None:
-                    wind_direction = round_value(wind_dir_10m.get("mean", 0))
-                else:
-                    wind_direction = "N/A"
-                
-                hour_data = {
-                    "time": hour.get("time"),
-                    "temperature_2m": round_dict_values(hour.get("temperature_2m", {})),
-                    "precipitation": round_dict_values(hour.get("precipitation", {})),
-                    "wind_speed": wind_speed,
-                    "wind_direction": wind_direction,
-                    "wind_height": wind_height,
-                    "freezing_level_height": round_value(hour.get("freezing_level_height", {}).get("mean", "N/A")) if isinstance(hour.get("freezing_level_height"), dict) and hour.get("freezing_level_height", {}).get("mean") is not None else "N/A",
-                    "probabilities": round_dict_values(hour.get("probabilities", {}))
-                }
-                
-                # Add snowfall data if available
-                snowfall = hour.get("snowfall", {})
-                if isinstance(snowfall, dict) and snowfall:
-                    hour_data["snowfall"] = round_value(snowfall.get("mean", 0))
-                elif "snow_calculations" in hour:
-                    snow_calc = hour["snow_calculations"]
-                    if isinstance(snow_calc, dict) and "snow_depth" in snow_calc:
-                        snow_depth = snow_calc["snow_depth"]
-                        hour_data["snowfall"] = round_value(snow_depth.get("expected", 0)) if isinstance(snow_depth, dict) else 0
-                
-                # Add units for clarity
-                hour_data["units"] = {
-                    "temperature": "°C",
-                    "precipitation": "mm",
-                    "snowfall": "cm",
-                    "wind_speed": "km/h",
-                    "wind_direction": "degrees",
-                    "freezing_level": "m"
-                }
-                    
-                next_6_hours.append(hour_data)
-            
-            # Process daily summaries with additional fields
-            daily_summaries = []
-            for day in forecast_dict.get("daily", [])[:3]:
-                # Extract temperature values
-                temp_data = day.get('temperature_2m', {})
-                temp_min = round_value(temp_data.get('min', 'N/A'))
-                temp_max = round_value(temp_data.get('max', 'N/A'))
-                
-                # Get snow data - check both snowfall and snow_calculations
-                snowfall_data = day.get('snowfall', {})
-                snow_calc_data = day.get('snow_calculations', {})
-                
-                # Try to get snowfall min/max from ensemble stats
-                if isinstance(snowfall_data, dict) and 'min' in snowfall_data:
-                    snow_min = round_value(snowfall_data.get('min', 0))
-                    snow_max = round_value(snowfall_data.get('max', 0))
-                elif isinstance(snow_calc_data, dict) and 'snow_depth' in snow_calc_data:
-                    # Use snow depth calculations if available
-                    snow_depth = snow_calc_data.get('snow_depth', {})
-                    snow_min = round_value(snow_depth.get('low', 0))
-                    snow_max = round_value(snow_depth.get('high', 0))
-                else:
-                    snow_min = 0
-                    snow_max = 0
-                
-                # Get wind data with fallback to 10m
-                wind_80m_data = day.get('wind_speed_80m', {})
-                wind_10m_data = day.get('wind_speed_10m', day.get('wind_speed_10m_mean', {}))
-                
-                # Check for 80m wind first, then fall back to 10m
-                if isinstance(wind_80m_data, dict) and (wind_80m_data.get('max') is not None or wind_80m_data.get('mean') is not None):
-                    wind_speed = round_value(wind_80m_data.get('max', wind_80m_data.get('mean', 0)))
-                    wind_height = "80m"
-                elif isinstance(wind_10m_data, dict) and (wind_10m_data.get('max') is not None or wind_10m_data.get('mean') is not None):
-                    # Apply terrain factor for ridge exposure
-                    base_speed = wind_10m_data.get('max', wind_10m_data.get('mean', 0))
-                    wind_speed = round_value(base_speed * 1.4)  # 40% increase
-                    wind_height = "10m_adjusted"
-                else:
-                    wind_speed = 0
-                    wind_height = "unavailable"
-                
-                # Get wind direction with fallback
-                wind_dir_80m = day.get('wind_direction_80m', {})
-                wind_dir_10m = day.get('wind_direction_10m', day.get('wind_direction_10m_dominant', {}))
-                
-                if isinstance(wind_dir_80m, dict) and wind_dir_80m.get('mean') is not None:
-                    wind_direction = round_value(wind_dir_80m.get('mean', 0))
-                elif isinstance(wind_dir_10m, dict) and (wind_dir_10m.get('mean') is not None or wind_dir_10m.get('dominant') is not None):
-                    wind_direction = round_value(wind_dir_10m.get('mean', wind_dir_10m.get('dominant', 0)))
-                else:
-                    wind_direction = 'Variable'
-                
-                # Get freezing level - handle missing data
-                freezing_data = day.get('freezing_level_height', {})
-                if isinstance(freezing_data, dict) and freezing_data.get('mean') is not None:
-                    freezing_level = round_value(freezing_data.get('mean', freezing_data.get('max', "N/A")))
-                else:
-                    freezing_level = "N/A"
-                
-                daily_summary = {
-                    "date": day.get("date"),
-                    "summary": day.get("summary", ""),
-                    "temperature_range": f"{temp_min} to {temp_max}°C",
-                    "temperature": {
-                        "min": temp_min,
-                        "max": temp_max,
-                        "units": "°C"
-                    },
-                    "precipitation_total": round_value(day.get('precipitation', {}).get('mean', 0)),
-                    "snowfall": {
-                        "min": snow_min,
-                        "max": snow_max,
-                        "units": "cm"
-                    },
-                    "wind": {
-                        "speed": wind_speed,
-                        "direction": wind_direction,
-                        "height": wind_height,
-                        "speed_units": "km/h",
-                        "direction_units": "degrees"
-                    },
-                    "freezing_level": {
-                        "height": freezing_level,
-                        "units": "m"
-                    }
-                }
-                daily_summaries.append(daily_summary)
-            
-            # Build simplified response with rounded values
-            simplified_response = {
-                "metadata": forecast_dict.get("metadata", {}),
-                "summary": round_dict_values(forecast_dict.get("summary", {})),
-                "current": round_dict_values(next_6_hours[0] if next_6_hours else {}),
-                "next_6_hours": next_6_hours,
-                "daily_summary": daily_summaries
-            }
-            return jsonify(simplified_response)
+        # Always return mountain-focused response
+        response = create_mountain_focused_response(
+            forecast_dict,
+            location_name,
+            elevation=elevation
+        )
         
-        return jsonify(forecast_dict)
+        return jsonify(response)
         
     except ValueError as e:
         return jsonify({"error": f"Invalid input: {str(e)}"}), 400
     except Exception as e:
+        app.logger.error(f"Forecast generation failed: {str(e)}")
         return jsonify({"error": f"Forecast generation failed: {str(e)}"}), 500
 
 @app.route('/api/health', methods=['GET'])
@@ -768,7 +587,7 @@ def health():
     return jsonify({
         "status": "healthy",
         "service": "Mountain Weather Forecast API",
-        "version": "1.0"
+        "version": "2.0"
     })
 
 @app.route('/api/test-forecast', methods=['POST'])
