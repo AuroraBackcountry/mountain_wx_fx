@@ -596,7 +596,7 @@ def get_forecast():
                     "precipitation": round_dict_values(hour.get("precipitation", {})),
                     "wind_speed_80m": round_dict_values(hour.get("wind_speed_80m", {})),
                     "wind_direction_80m": round_value(hour.get("wind_direction_80m", {}).get("mean", 0)) if isinstance(hour.get("wind_direction_80m"), dict) else "N/A",
-                    "freezing_level_height": round_value(hour.get("freezing_level_height", {}).get("mean", 0)) if isinstance(hour.get("freezing_level_height"), dict) else 0,
+                    "freezing_level_height": round_value(hour.get("freezing_level_height", {}).get("mean", "N/A")) if isinstance(hour.get("freezing_level_height"), dict) and hour.get("freezing_level_height", {}).get("mean") is not None else "N/A",
                     "probabilities": round_dict_values(hour.get("probabilities", {}))
                 }
                 
@@ -658,12 +658,12 @@ def get_forecast():
                 else:
                     wind_direction = 'Variable'
                 
-                # Get freezing level
+                # Get freezing level - handle missing data
                 freezing_data = day.get('freezing_level_height', {})
-                if isinstance(freezing_data, dict):
-                    freezing_level = round_value(freezing_data.get('mean', freezing_data.get('max', 0)))
+                if isinstance(freezing_data, dict) and freezing_data.get('mean') is not None:
+                    freezing_level = round_value(freezing_data.get('mean', freezing_data.get('max', "N/A")))
                 else:
-                    freezing_level = 0
+                    freezing_level = "N/A"
                 
                 daily_summary = {
                     "date": day.get("date"),

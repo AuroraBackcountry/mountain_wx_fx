@@ -56,10 +56,15 @@ def run_forecast(lat, lon, days=3, location_name=None,
         hourly_vars = [
             "temperature_2m", 
             "relative_humidity_2m",
+            "dew_point_2m",
             "precipitation", 
             "snowfall",
+            "cloud_cover",
+            "surface_pressure",
             "wind_speed_80m",
-            "wind_direction_80m"
+            "wind_direction_80m",
+            "temperature_850hPa",
+            "freezing_level_height"
         ]
     
     if daily_vars is None:
@@ -72,7 +77,7 @@ def run_forecast(lat, lon, days=3, location_name=None,
         ]
     
     if models is None:
-        models = ["ecmwf_ifs025", "gem_global", "ecmwf_aifs025", "gfs_seamless"]
+        models = ["ecmwf_ifs025", "gfs_seamless", "gem_global", "icon_global"]
     
     # Setup API client
     cache_session = requests_cache.CachedSession('.cache', expire_after=3600)
