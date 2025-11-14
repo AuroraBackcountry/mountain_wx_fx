@@ -41,13 +41,21 @@ class EnhancedForecastGenerator:
             'alerts': []
         }
         
+        # Store location for later use
+        self.location = location
+        
         # Process hourly data
         if 'hourly' in data and data['hourly'] is not None:
             forecast['hourly'] = self._process_hourly_enhanced(data['hourly'])
             
         # Process daily data with proper aggregation
         if 'daily' in data and data['daily'] is not None:
-            forecast['daily'] = self._process_daily_enhanced(data['daily'], data.get('hourly'))
+            # Pass the processed hourly forecast for better aggregation
+            forecast['daily'] = self._process_daily_enhanced(
+                data['daily'], 
+                data.get('hourly'),
+                forecast.get('hourly', [])
+            )
             
         # Generate enhanced summary
         forecast['summary'] = self._generate_mountain_summary(forecast)
@@ -284,7 +292,8 @@ class EnhancedForecastGenerator:
         return probs
     
     def _process_daily_enhanced(self, daily_df: pd.DataFrame, 
-                               hourly_df: Optional[pd.DataFrame]) -> List[Dict[str, Any]]:
+                               hourly_df: Optional[pd.DataFrame],
+                               processed_hourly: List[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
         """Process daily data with proper aggregation from hourly."""
         daily_forecast = []
         
@@ -323,7 +332,14 @@ class EnhancedForecastGenerator:
             entry['wind'] = self._get_daily_wind(daily_df, hourly_df, date)
             
             # Freezing level - aggregate from hourly if available
-            if hourly_df is not None:
+            if processed_hourly:
+                # Use processed hourly forecast data
+                fl_daily = self._aggregate_daily_freezing_level_from_forecast(
+                    processed_hourly, date.strftime('%Y-%m-%d')
+                )
+                entry['freezing_level'] = round(fl_daily) if fl_daily > 0 else 'N/A'
+            elif hourly_df is not None:
+                # Fall back to raw data
                 fl_daily = self._aggregate_daily_freezing_level(hourly_df, date)
                 entry['freezing_level'] = round(fl_daily) if fl_daily > 0 else 'N/A'
             else:
@@ -427,30 +443,79 @@ class EnhancedForecastGenerator:
         if day_data.empty:
             return 0
         
-        fl_cols = [c for c in day_data.columns if 'freezing_level_height' in c and 'member' in c]
-        if fl_cols:
-            all_values = []
+        # First check if we have freezing_level_height in the processed hourly data
+        # This would be from the already processed hourly forecast
+        freezing_levels = []
+        for idx in day_data.index:
+            # Look for freezing_level_height data that was already calculated
+            fl_cols = [c for c in day_data.columns if 'freezing_level_height' in c]
             for col in fl_cols:
-                valid = day_data[col].values[~np.isnan(day_data[col].values)]
-                if len(valid) > 0:
-                    all_values.extend(valid)
-            
-            if all_values:
-                return float(np.mean(all_values))
+                val = day_data.loc[idx, col]
+                if pd.notna(val) and val > 0:
+                    freezing_levels.append(val)
         
-        # Estimate from temperature if not available
+        if freezing_levels:
+            return float(np.mean(freezing_levels))
+        
+        # If not, estimate from temperature using lapse rate
         temp_cols = [c for c in day_data.columns if 'temperature_2m' in c and 'member' in c]
         if temp_cols:
-            max_temps = []
+            # Get all temperature values for the day
+            all_temps = []
             for col in temp_cols:
                 valid = day_data[col].values[~np.isnan(day_data[col].values)]
                 if len(valid) > 0:
-                    max_temps.append(np.max(valid))
+                    all_temps.extend(valid)
             
-            if max_temps:
-                max_temp = np.mean(max_temps)
-                if max_temp > 0:
-                    return max_temp / 0.0065  # Standard lapse rate
+            if all_temps:
+                # Use the mean temperature of the day
+                mean_temp = np.mean(all_temps)
+                # Calculate freezing level using standard lapse rate
+                # Add elevation if available
+                elevation = getattr(self, 'elevation', 0)
+                if elevation == 0:
+                    elevation = 1500  # Default mountain elevation
+                
+                # Freezing level = elevation + (temperature / lapse_rate)
+                freezing_level = elevation + (mean_temp / 0.0065)
+                return max(freezing_level, 0)  # Ensure non-negative
+        
+        return 0
+    
+    def _aggregate_daily_freezing_level_from_forecast(self, 
+                                                     hourly_forecast: List[Dict[str, Any]], 
+                                                     date_str: str) -> float:
+        """Aggregate freezing level from processed hourly forecast."""
+        freezing_levels = []
+        
+        # Extract freezing levels for the given date
+        for hour in hourly_forecast:
+            if hour.get('time', '').startswith(date_str):
+                fl = hour.get('freezing_level_height')
+                if fl and isinstance(fl, (int, float)) and fl > 0:
+                    freezing_levels.append(fl)
+        
+        if freezing_levels:
+            return float(np.mean(freezing_levels))
+        
+        # If no freezing level data, estimate from temperature
+        temps = []
+        for hour in hourly_forecast:
+            if hour.get('time', '').startswith(date_str):
+                temp = hour.get('temperature_2m', {}).get('mean')
+                if temp is not None:
+                    temps.append(temp)
+        
+        if temps:
+            mean_temp = np.mean(temps)
+            # Use location elevation if available
+            elevation = self.location.get('elevation', 1500)
+            if elevation == 'not_specified':
+                elevation = 1500
+            
+            # Calculate freezing level
+            freezing_level = elevation + (mean_temp / 0.0065)
+            return max(freezing_level, 0)
         
         return 0
     
