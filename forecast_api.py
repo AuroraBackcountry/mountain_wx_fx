@@ -498,11 +498,13 @@ def get_forecast():
         "latitude": 50.06,
         "longitude": -123.15,
         "location_name": "Squamish, BC",
-        "forecast_days": 3
+        "forecast_days": 3,
+        "simplified": true
     }
     """
     try:
         data = request.json
+        app.logger.info(f"Received request data: {data}")  # Log incoming data
         
         # Validate required fields
         if not data or 'latitude' not in data or 'longitude' not in data:
@@ -513,7 +515,13 @@ def get_forecast():
             lat = float(data['latitude'])
             lon = float(data['longitude'])
             days = int(data.get('forecast_days', 3))  # Ensure it's an integer
-            simplified = data.get('simplified', False)  # Option for smaller response
+            
+            # Handle boolean conversion for simplified parameter
+            simplified_param = data.get('simplified', False)
+            if isinstance(simplified_param, str):
+                simplified = simplified_param.lower() == 'true'
+            else:
+                simplified = bool(simplified_param)
         except (ValueError, TypeError) as e:
             return jsonify({
                 "error": "Invalid data type",
