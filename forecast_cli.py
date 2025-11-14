@@ -46,6 +46,11 @@ def run_forecast(lat, lon, days=3, location_name=None,
         Dictionary with forecast data
     """
     
+    # Ensure proper types
+    lat = float(lat)
+    lon = float(lon)
+    days = int(days)
+    
     # Default variables if not specified
     if hourly_vars is None:
         hourly_vars = [

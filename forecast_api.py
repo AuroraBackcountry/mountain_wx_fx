@@ -508,9 +508,22 @@ def get_forecast():
         if not data or 'latitude' not in data or 'longitude' not in data:
             return jsonify({"error": "Missing latitude or longitude"}), 400
         
-        lat = float(data['latitude'])
-        lon = float(data['longitude'])
-        days = data.get('forecast_days', 3)
+        # Convert and validate data types
+        try:
+            lat = float(data['latitude'])
+            lon = float(data['longitude'])
+            days = int(data.get('forecast_days', 3))  # Ensure it's an integer
+        except (ValueError, TypeError) as e:
+            return jsonify({
+                "error": "Invalid data type",
+                "details": "Latitude and longitude must be numbers, forecast_days must be an integer",
+                "received": {
+                    "latitude": f"{type(data.get('latitude')).__name__}: {data.get('latitude')}",
+                    "longitude": f"{type(data.get('longitude')).__name__}: {data.get('longitude')}",
+                    "forecast_days": f"{type(data.get('forecast_days')).__name__}: {data.get('forecast_days')}"
+                }
+            }), 400
+            
         location_name = data.get('location_name', f"{lat}, {lon}")
         
         # Validate ranges

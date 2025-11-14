@@ -1,6 +1,10 @@
-# Ensemble Weather Forecast System
+# 🏔️ Mountain Weather Forecast System
 
-Complete system for processing ensemble weather forecast data from Open-Meteo API and generating structured JSON forecasts with statistics, probabilities, and model comparisons.
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Open-Meteo API](https://img.shields.io/badge/API-Open--Meteo-green)](https://open-meteo.com/)
+
+Complete ensemble weather forecast processing system designed for mountain environments. Integrates with Open-Meteo API to generate detailed JSON forecasts with statistics, probabilities, and model comparisons.
 
 ## 📁 Project Structure
 
