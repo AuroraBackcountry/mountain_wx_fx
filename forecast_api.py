@@ -492,7 +492,7 @@ def dashboard():
 def get_forecast():
     """
     Mountain-focused weather forecast endpoint.
-    Now returns enhanced format with trends, hazards, and accurate snow calculations.
+    Now returns enhanced format with hazards and accurate snow calculations.
     
     Expected POST data:
     {

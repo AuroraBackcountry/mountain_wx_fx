@@ -8,94 +8,12 @@ Core Principles:
 3. Highly accurate temperatures and freezing levels
 4. Wind data with direction
 5. Elevation reference
-6. Clear trend analysis
-7. Easy-to-read JSON for n8n
+6. Easy-to-read JSON for n8n
 """
 
 from typing import Dict, List, Any, Tuple
 import numpy as np
 from datetime import datetime, timedelta
-
-def analyze_trends(hourly_data: List[Dict], hours: int = 6) -> Dict[str, str]:
-    """
-    Analyze weather trends over specified hours.
-    Returns human-readable trend descriptions.
-    """
-    if not hourly_data or len(hourly_data) < hours:
-        return {}
-    
-    trends = {}
-    
-    # Temperature trend
-    temps = [h.get('temperature_2m', {}).get('mean', 0) for h in hourly_data[:hours]]
-    temp_change = temps[-1] - temps[0] if temps else 0
-    
-    if temp_change > 3:
-        trends['temperature'] = 'rising_rapidly'
-    elif temp_change > 1:
-        trends['temperature'] = 'rising'
-    elif temp_change < -3:
-        trends['temperature'] = 'falling_rapidly'
-    elif temp_change < -1:
-        trends['temperature'] = 'falling'
-    else:
-        trends['temperature'] = 'steady'
-    
-    # Cloud cover trend
-    if all('cloud_cover' in h for h in hourly_data[:hours]):
-        cloud_start = np.mean([h['cloud_cover']['mean'] for h in hourly_data[:2]])
-        cloud_end = np.mean([h['cloud_cover']['mean'] for h in hourly_data[hours-2:hours]])
-        
-        if cloud_start > 70 and cloud_end < 30:
-            trends['sky'] = 'clearing'
-        elif cloud_start < 30 and cloud_end > 70:
-            trends['sky'] = 'clouding_up'
-        elif cloud_end < 20:
-            trends['sky'] = 'clear'
-        elif cloud_end > 80:
-            trends['sky'] = 'overcast'
-        else:
-            trends['sky'] = 'partly_cloudy'
-    
-    # Wind trend
-    winds = [h.get('wind_speed', {}).get('mean', 0) for h in hourly_data[:hours]]
-    if len(winds) >= 2:
-        wind_change = winds[-1] - winds[0]
-        
-        if wind_change > 20:
-            trends['wind'] = 'increasing_rapidly'
-        elif wind_change > 10:
-            trends['wind'] = 'increasing'
-        elif wind_change < -20:
-            trends['wind'] = 'decreasing_rapidly'
-        elif wind_change < -10:
-            trends['wind'] = 'decreasing'
-        else:
-            trends['wind'] = 'steady'
-    
-    # Precipitation trend
-    precip_probs = []
-    for h in hourly_data[:hours]:
-        probs = h.get('probabilities', {})
-        if probs and 'precipitation' in probs:
-            precip_probs.append(probs['precipitation'].get('any', 0))
-        else:
-            precip_probs.append(0)
-    
-    if precip_probs:
-        avg_start = np.mean(precip_probs[:2])
-        avg_end = np.mean(precip_probs[-2:])
-        
-        if avg_end > 0.7 and avg_start < 0.3:
-            trends['precipitation'] = 'developing'
-        elif avg_start > 0.7 and avg_end < 0.3:
-            trends['precipitation'] = 'ending'
-        elif avg_end > 0.5:
-            trends['precipitation'] = 'likely'
-        else:
-            trends['precipitation'] = 'unlikely'
-    
-    return trends
 
 def get_6hour_summary(hourly_data: List[Dict]) -> List[Dict[str, Any]]:
     """
@@ -201,8 +119,7 @@ def get_daily_summary(daily_data: List[Dict], hourly_data: List[Dict] = None) ->
                 'max_rate': round(day.get('snowfall', {}).get('max_hourly', 0), 1)
             },
             'freezing_level': {
-                'average': day.get('freezing_level', 'N/A'),
-                'trend': 'rising' if day.get('freezing_level', 0) > daily_data[0].get('freezing_level', 0) else 'falling'
+                'average': day.get('freezing_level', 'N/A')
             },
             'conditions': day.get('summary', ''),
             'hazards': identify_hazards(day)
@@ -337,8 +254,7 @@ def create_mountain_focused_response(forecast: Dict, location_name: str, elevati
     3. Advanced snowfall data
     4. Accurate temperatures and freezing levels
     5. Complete wind data
-    6. Clear trends
-    7. Easy n8n integration
+    6. Easy n8n integration
     """
     
     # Extract hourly and daily data
@@ -347,9 +263,6 @@ def create_mountain_focused_response(forecast: Dict, location_name: str, elevati
     
     # Get current conditions (first hour)
     current = hourly_data[0] if hourly_data else {}
-    
-    # Analyze trends
-    trends = analyze_trends(hourly_data, 6)
     
     # Build focused response
     response = {
@@ -390,13 +303,6 @@ def create_mountain_focused_response(forecast: Dict, location_name: str, elevati
                 'unit': 'cm/hr'
             }
         },
-        'trends': {
-            'temperature': trends.get('temperature', 'steady'),
-            'sky': trends.get('sky', 'unknown'),
-            'wind': trends.get('wind', 'steady'),
-            'precipitation': trends.get('precipitation', 'unknown'),
-            'summary': generate_trend_summary(trends)
-        },
         'next_6_hours': get_6hour_summary(hourly_data),
         'next_3_days': get_daily_summary(daily_data, hourly_data),
         'accuracy_metrics': {
@@ -436,45 +342,3 @@ def create_mountain_focused_response(forecast: Dict, location_name: str, elevati
     
     return response
 
-def generate_trend_summary(trends: Dict[str, str]) -> str:
-    """Generate human-readable trend summary."""
-    parts = []
-    
-    # Temperature
-    temp_trend = trends.get('temperature', 'steady')
-    if temp_trend == 'rising_rapidly':
-        parts.append('Temperature rising rapidly')
-    elif temp_trend == 'falling_rapidly':
-        parts.append('Temperature falling rapidly')
-    elif temp_trend == 'rising':
-        parts.append('Temperature rising')
-    elif temp_trend == 'falling':
-        parts.append('Temperature falling')
-    
-    # Sky
-    sky_trend = trends.get('sky', '')
-    if sky_trend == 'clearing':
-        parts.append('clearing skies')
-    elif sky_trend == 'clouding_up':
-        parts.append('increasing clouds')
-    
-    # Wind
-    wind_trend = trends.get('wind', 'steady')
-    if wind_trend == 'increasing_rapidly':
-        parts.append('wind increasing rapidly')
-    elif wind_trend == 'increasing':
-        parts.append('wind increasing')
-    elif wind_trend == 'decreasing':
-        parts.append('wind decreasing')
-    
-    # Precipitation
-    precip_trend = trends.get('precipitation', '')
-    if precip_trend == 'developing':
-        parts.append('precipitation developing')
-    elif precip_trend == 'ending':
-        parts.append('precipitation ending')
-    
-    if parts:
-        return ', '.join(parts).capitalize() + '.'
-    else:
-        return 'Conditions remaining steady.'
